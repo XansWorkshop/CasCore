@@ -27,18 +27,18 @@ public sealed class CasPolicy
     /// </summary>
     /// <param name="field">The field to be read/written.</param>
     /// <returns>Whether the field is accessible.</returns>
-    internal bool CanAccess(FieldInfo field)
+    public bool CanAccess(FieldInfo field)
     {
         var memberId = new MemberId(field);
         return _accessibleMembers.Contains(memberId);
     }
 
-    /// <summary>
-    /// Determines whether this policy allows the specified method to be called.
-    /// </summary>
-    /// <param name="method">The method to be invoked.</param>
-    /// <returns>Whether the method is accessible.</returns>
-    internal bool CanAccess(MethodBase method)
+	/// <summary>
+	/// Determines whether this policy allows the specified method to be called.
+	/// </summary>
+	/// <param name="method">The method to be invoked.</param>
+	/// <returns>Whether the method is accessible.</returns>
+	public bool CanAccess(MethodBase method)
     {
         var memberId = new MemberId(method);
         return _accessibleMembers.Contains(memberId);
