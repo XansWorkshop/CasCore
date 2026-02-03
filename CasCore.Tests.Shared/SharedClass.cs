@@ -16,6 +16,8 @@ public class SharedClass : ISharedInterface
 
     public virtual void VirtualMethod() { }
 
+    public virtual void DeniedVirtualMethod() { }
+
     public T InterfaceMethod<T>(T input)
     {
         return input;
@@ -25,7 +27,9 @@ public class SharedClass : ISharedInterface
     {
         public override void VirtualMethod() { }
 
-        public new T InterfaceMethod<T>(T input)
+		public override void DeniedVirtualMethod() { }
+
+		public new T InterfaceMethod<T>(T input)
         {
             return input;
         }
