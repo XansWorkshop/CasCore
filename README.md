@@ -6,5 +6,5 @@ For the original repository, please visit https://github.com/DouglasDwyer/CasCor
 
 CasCore: Conservatory Edition implements some special behavior specifically designed for [The Conservatory](https://xansworkshop.com/conservatory). The behavioral changes include the following:
 
-1. Inclusion of `DouglasDwyer.CasCore.ConservatoryInterop.ModMethods` class.
-	1. Introduction of `ModMethods.@stackalloc<T>(long count)`. This is a safe shim to the `stackalloc` statement.
+1. Introduce a special shim to allow `Span<T> span = stackalloc T[n]` pattern by injecting verification code.
+2. Add support for .NET 10 SIMD code.
