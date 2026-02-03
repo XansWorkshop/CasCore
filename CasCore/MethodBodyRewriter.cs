@@ -9,6 +9,11 @@ namespace CasCore;
 /// </summary>
 internal class MethodBodyRewriter
 {
+	/// <summary>
+	/// Added by Xan. Helps with debugging a bit due to some helper code in The Conservatory
+	/// </summary>
+	const int SPECIAL_BODY_MAGIC = ('C' << 16) | ('A' << 8) | ('S' << 0);
+	
     /// <summary>
     /// The current instruction being rewritten, if any.
     /// </summary>
@@ -98,7 +103,7 @@ internal class MethodBodyRewriter
     /// <param name="instruction">The new instruction to add.</param>
     public void Insert(Instruction instruction)
     {
-        instruction.Offset = int.MaxValue;
+        instruction.Offset = SPECIAL_BODY_MAGIC;
         _newInstructions.Add(instruction);
     }
 
@@ -141,7 +146,7 @@ internal class MethodBodyRewriter
         {
             return null;
         }
-        else if (instruction.Offset == int.MaxValue)
+        else if (instruction.Offset == SPECIAL_BODY_MAGIC)
         {
             return instruction;
         }

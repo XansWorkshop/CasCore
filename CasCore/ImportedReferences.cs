@@ -1,5 +1,6 @@
 ﻿using Mono.Cecil;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 
 namespace DouglasDwyer.CasCore;
 
@@ -58,8 +59,23 @@ internal class ImportedReferences
     /// </summary>
     public required IImmutableDictionary<SignatureHash, MethodReference> ShimmedMethods;
 
-    /// <summary>
-    /// The <see cref="void"/> type.
-    /// </summary>
-    public required TypeReference VoidType;
+	/// <summary>
+	/// The <see cref="void"/> type.
+	/// </summary>
+	public required TypeReference VoidType;
+
+	/// <summary>
+	/// The <see cref="nuint"/> type.
+	/// </summary>
+	public required TypeReference UIntPtrType;
+
+	/// <summary>
+	/// The <see cref="Span{T}"/> type.
+	/// </summary>
+	public required TypeReference SpanType;
+
+	/// <summary>
+	/// The <see cref="BadImageFormatException"/> type's constructor.
+	/// </summary>
+	public required MethodReference BadImageFormatExceptionCtor;
 }
