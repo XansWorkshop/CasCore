@@ -9,7 +9,7 @@ namespace DouglasDwyer.CasCore;
 /// A helper class for determining which method will <b>actually</b> be
 /// invoked as the result of a virtual call.
 /// </summary>
-internal unsafe static class LateBindingResolver
+public unsafe static class LateBindingResolver
 {
     /// <summary>
     /// Gets the handle of the method that would actually be invoked
