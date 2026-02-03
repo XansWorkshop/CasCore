@@ -1,5 +1,7 @@
 ﻿using System.Security;
 
+using DouglasDwyer.CasCore.Tests.Shared;
+
 namespace DouglasDwyer.CasCore.Tests;
 
 public static class TestDelegateCreation
@@ -19,6 +21,13 @@ public static class TestDelegateCreation
     {
         var deleg = (FileWriteAllBytes)Delegate.CreateDelegate(typeof(FileWriteAllBytes), typeof(File), "WriteAllBytes");
         deleg("hello.txt", [1, 2, 3]);
+    }
+
+	[TestException(typeof(SecurityException))]
+	public static void TestInstanceVirtualDelegateDenied() {
+        SharedClass cls = new SharedClass.SharedNested();
+		Action deleg = cls.DeniedVirtualMethod;
+        deleg();
     }
 
     [TestSuccessful]

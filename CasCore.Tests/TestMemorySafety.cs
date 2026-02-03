@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Diagnostics;
+using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Security;
@@ -25,14 +26,54 @@ public static class TestMemorySafety
         return z;
     }
 
-    [TestException(typeof(TypeInitializationException))]
+	/*
+	[TestException(typeof(TypeInitializationException))]
     public static unsafe int* TestInvalidStackalloc()
     {
-        var data = stackalloc int[28];
+        int* data = stackalloc int[28];
         return data;
-    }
+	}
+	*/
 
-    [TestSuccessful]
+	[TestSuccessful]
+	//[TestException(typeof(TypeInitializationException))]
+	public static int TestSafeStackAlloc() {
+		Span<int> test = stackalloc int[4];
+		return test[0];
+	}
+
+	[TestSuccessful]
+	//[TestException(typeof(TypeInitializationException))]
+	public static int TestSafeStackAllocUnknownArg() {
+		return TestSafeStackAlloc(8);
+	}
+
+	//[TestException(typeof(TypeInitializationException))]
+	public static int TestSafeStackAlloc(int length) {
+		Span<int> test = stackalloc int[length];
+		return test[0];
+	}
+
+	[TestException(typeof(TypeInitializationException))]
+	public static unsafe int TestFixedPtr() {
+		Span<int> test = stackalloc int[4];
+		fixed (int* fv = &test[0]) {
+			return *fv;
+		}
+	}
+
+	[TestException(typeof(SecurityException))]
+	public static unsafe void TestIntToPointerCast() {
+		nint address = 0x0000000000000000;
+		Span<byte> nullptr = new Span<byte>((void*)address, 1);
+	}
+
+	[TestException(typeof(SecurityException))]
+	public static void TestStartNotepad() {
+		Process.Start("notepad");
+	}
+
+	[TestSuccessful]
     public static unsafe int TestRefRead()
     {
         var x = 1;

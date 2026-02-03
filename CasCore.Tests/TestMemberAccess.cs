@@ -41,21 +41,36 @@ public static class TestMemberAccess
     {
         var instance = new SharedClass();
         var x = instance.AllowedField;
-    }
+	}
 
-    [TestException(typeof(SecurityException))]
-    public static void TestAccessDeniedVirtualMethod()
-    {
-        CallVirtualMethod(new SharedClass());
-    }
+	[TestException(typeof(SecurityException))]
+	public static void TestAccessDeniedVirtualMethod() {
+		CallVirtualMethod(new SharedClass());
+	}
 
-    [TestSuccessful]
+	[TestSuccessful]
     public static void TestAccessAllowedVirtualMethod()
     {
         CallVirtualMethod(new SharedClass.SharedNested());
-    }
+	}
 
-    [TestSuccessful]
+	[TestException(typeof(SecurityException))]
+	public static void TestAccessDeniedVirtualMethodExplicit() {
+		CallDeniedVirtualMethod(new SharedClass());
+	}
+
+	[TestException(typeof(SecurityException))]
+	public static void TestAccessDeniedVirtualMethodExplicitNested() {
+		CallDeniedVirtualMethod(new SharedClass.SharedNested());
+	}
+
+	[TestException(typeof(SecurityException))]
+	public static void TestAccessDeniedVirtualMethodExplicitNestedExplicit() {
+		CallDeniedVirtualMethodNested(new SharedClass.SharedNested());
+	}
+
+
+	[TestSuccessful]
     public static void TestAccessAllowedInterfaceMethod()
     {
         CallInterfaceMethod(new SharedClass(), 29);
@@ -65,14 +80,21 @@ public static class TestMemberAccess
     public static void TestAccessDeniedInterfaceMethod()
     {
         CallInterfaceMethod(new SharedClass.SharedNested(), 29);
-    }
+	}
 
-    private static void CallVirtualMethod(SharedClass shared)
-    {
-        shared.VirtualMethod();
-    }
+	private static void CallVirtualMethod(SharedClass shared) {
+		shared.VirtualMethod();
+	}
 
-    private static void CallInterfaceMethod<T>(ISharedInterface shared, T value)
+	private static void CallDeniedVirtualMethod(SharedClass shared) {
+		shared.DeniedVirtualMethod();
+	}
+
+	private static void CallDeniedVirtualMethodNested(SharedClass.SharedNested nested) {
+		nested.DeniedVirtualMethod();
+	}
+
+	private static void CallInterfaceMethod<T>(ISharedInterface shared, T value)
     {
         shared.InterfaceMethod(value);
     }
