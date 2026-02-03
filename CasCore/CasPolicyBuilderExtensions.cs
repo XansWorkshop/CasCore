@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.Intrinsics;
 using System.Security;
 
 namespace DouglasDwyer.CasCore;
@@ -64,12 +65,171 @@ public static class CasPolicyBuilderExtensions
             .Allow(new AssemblyBinding(Assembly.Load("System.Collections.Specialized"), Accessibility.Protected));
     }
 
-    /// <summary>
-    /// Adds all safe members from the <c>System.ComponentModel.TypeConverter</c> assembly.
-    /// </summary>
-    /// <param name="builder">The builder to which members should be added.</param>
-    /// <returns>The modified builder.</returns>
-    public static CasPolicyBuilder WithSandboxedSystemComponentModelTypeConverter(this CasPolicyBuilder builder)
+	/// <summary>
+	/// Added by Xan. Adds all safe members from <c>System.Runtime.Intrinsics</c>, which enable the use of native SIMD
+	/// instructions for performance.
+	/// </summary>
+	/// <param name="builder"></param>
+	/// <returns></returns>
+	private static unsafe CasPolicyBuilder WithHardwareIntrinsicsSandbox(this CasPolicyBuilder builder) {
+		static IEnumerable<MemberInfo> WhereNotPointer(IEnumerable<MemberInfo> members) {
+			return members.Where(static delegate (MemberInfo mbr) {
+				if (mbr is FieldInfo fld) {
+					return !fld.FieldType.IsPointer;
+				} else if (mbr is MethodBase mtd) {
+					if (!mtd.GetParameters().All(parameter => !parameter.ParameterType.IsPointer)) return false;
+					if (mtd is MethodInfo actualMethod) {
+						return !actualMethod.ReturnParameter.ParameterType.IsPointer;
+					}
+					return true;
+				}
+				return true;
+			});
+		}
+		static IEnumerable<MemberInfo> PublicWhereNotPointer(Type type) {
+			return WhereNotPointer(new TypeBinding(type, Accessibility.Public));
+		}
+
+		ReadOnlySpan<Type> validVectorTypes = [
+			typeof(sbyte), typeof(byte),
+			typeof(short), typeof(ushort),
+			typeof(int), typeof(uint),
+			typeof(long), typeof(ulong),
+			typeof(float), typeof(double),
+			typeof(nint), typeof(nuint)
+		];
+
+		// Vector types:
+		builder = builder
+			.Allow(PublicWhereNotPointer(typeof(Vector64)))
+			.Allow(PublicWhereNotPointer(typeof(Vector128)))
+			.Allow(PublicWhereNotPointer(typeof(Vector256)))
+			.Allow(PublicWhereNotPointer(typeof(Vector512)));
+
+		for (int i = 0; i < validVectorTypes.Length; i++) {
+			Type v64 = typeof(Vector64<>).MakeGenericType(validVectorTypes[i]);
+			Type v128 = typeof(Vector128<>).MakeGenericType(validVectorTypes[i]);
+			Type v256 = typeof(Vector256<>).MakeGenericType(validVectorTypes[i]);
+			Type v512 = typeof(Vector512<>).MakeGenericType(validVectorTypes[i]);
+			builder = builder
+				.Allow(PublicWhereNotPointer(v64))
+				.Allow(PublicWhereNotPointer(v128))
+				.Allow(PublicWhereNotPointer(v256))
+				.Allow(PublicWhereNotPointer(v512));
+		}
+
+		// Intrinsics:
+		builder = builder
+			// x86 / x64
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Sse)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Sse.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Sse2)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Sse2.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Sse3)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Sse3.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Ssse3)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Ssse3.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Sse41)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Sse41.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Sse42)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Sse42.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx2)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx2.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx10v1)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx10v1.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx10v1.V512)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx10v2)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx10v2.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx10v2.V512)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.AvxVnni)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.AvxVnni.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.AvxVnniInt8)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.AvxVnniInt8.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.AvxVnniInt8.V512)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.AvxVnniInt16)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.AvxVnniInt16.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.AvxVnniInt16.V512)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512F)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512F.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512F.VL)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512DQ)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512DQ.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512DQ.VL)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512CD)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512CD.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512CD.VL)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512BW)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512BW.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512BW.VL)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512Vbmi)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512Vbmi.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512Vbmi.VL)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512Vbmi2)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512Vbmi2.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Avx512Vbmi2.VL)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Aes)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Aes.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Bmi1)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Bmi1.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Bmi2)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Bmi2.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Fma)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Fma.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Gfni)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Gfni.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Gfni.V256)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Gfni.V512)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Lzcnt)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Lzcnt.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Pclmulqdq)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Pclmulqdq.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Pclmulqdq.V256)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Pclmulqdq.V512)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Popcnt)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.Popcnt.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.X86Base)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.X86Base.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.X86Serialize)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.X86Serialize.X64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.FloatRoundingMode)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.X86.FloatComparisonMode)))
+
+			// ARM
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.AdvSimd)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.AdvSimd.Arm64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Aes)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Aes.Arm64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Crc32)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Crc32.Arm64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Dp)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Dp.Arm64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Rdm)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Rdm.Arm64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Sha1)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Sha1.Arm64)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Sha256)))
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Sha256.Arm64)))
+			//.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Sve)))
+			//.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Sve.Arm64)))
+			//.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Sve2)))
+			//.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.Sve2.Arm64)))
+			//.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.SvePrefetchType)))
+			//.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Arm.SveMaskPattern)))
+
+			// WASM
+			.Allow(PublicWhereNotPointer(typeof(System.Runtime.Intrinsics.Wasm.PackedSimd)));
+
+		return builder;
+	}
+
+	/// <summary>
+	/// Adds all safe members from the <c>System.ComponentModel.TypeConverter</c> assembly.
+	/// </summary>
+	/// <param name="builder">The builder to which members should be added.</param>
+	/// <returns>The modified builder.</returns>
+	public static CasPolicyBuilder WithSandboxedSystemComponentModelTypeConverter(this CasPolicyBuilder builder)
     {
         return builder
             .Allow(new TypeBinding(typeof(System.Timers.ElapsedEventArgs), Accessibility.Protected))
@@ -1047,8 +1207,11 @@ public static class CasPolicyBuilderExtensions
                 .WithMethod("EqualsAny", Accessibility.Protected)
                 .WithMethod("Floor", [typeof(System.Numerics.Vector<System.Double> /*value*/),], Accessibility.Protected)
                 .WithMethod("Floor", [typeof(System.Numerics.Vector<System.Single> /*value*/),], Accessibility.Protected)
-                .WithMethod("GetElement", Accessibility.Protected)
-                .WithMethod("GreaterThan", [typeof(System.Numerics.Vector<> /*left*/), typeof(System.Numerics.Vector<> /*right*/),], Accessibility.Protected)
+				.WithMethod("GetElement", [typeof(System.Numerics.Vector2), typeof(int)], Accessibility.Protected)
+				.WithMethod("GetElement", [typeof(System.Numerics.Vector3), typeof(int)], Accessibility.Protected)
+				.WithMethod("GetElement", [typeof(System.Numerics.Vector4), typeof(int)], Accessibility.Protected)
+				.WithMethod("GetElement", [typeof(System.Numerics.Vector<>), typeof(int)], Accessibility.Protected)
+				.WithMethod("GreaterThan", [typeof(System.Numerics.Vector<> /*left*/), typeof(System.Numerics.Vector<> /*right*/),], Accessibility.Protected)
                 .WithMethod("GreaterThan", [typeof(System.Numerics.Vector<System.Double> /*left*/), typeof(System.Numerics.Vector<System.Double> /*right*/),], Accessibility.Protected)
                 .WithMethod("GreaterThan", [typeof(System.Numerics.Vector<System.Int32> /*left*/), typeof(System.Numerics.Vector<System.Int32> /*right*/),], Accessibility.Protected)
                 .WithMethod("GreaterThan", [typeof(System.Numerics.Vector<System.Int64> /*left*/), typeof(System.Numerics.Vector<System.Int64> /*right*/),], Accessibility.Protected)
@@ -1118,8 +1281,11 @@ public static class CasPolicyBuilderExtensions
                 .WithMethod("SquareRoot", Accessibility.Protected)
                 .WithMethod("Subtract", Accessibility.Protected)
                 .WithMethod("Sum", Accessibility.Protected)
-                .WithMethod("ToScalar", Accessibility.Protected)
-                .WithMethod("Widen", [typeof(System.Numerics.Vector<System.Byte> /*source*/), typeof(System.Numerics.Vector<System.UInt16> /*low*/).MakeByRefType(), typeof(System.Numerics.Vector<System.UInt16> /*high*/).MakeByRefType(),], Accessibility.Protected)
+				.WithMethod("ToScalar", [typeof(System.Numerics.Vector2)], Accessibility.Protected)
+				.WithMethod("ToScalar", [typeof(System.Numerics.Vector3)], Accessibility.Protected)
+				.WithMethod("ToScalar", [typeof(System.Numerics.Vector4)], Accessibility.Protected)
+				.WithMethod("ToScalar", [typeof(System.Numerics.Vector<>)], Accessibility.Protected)
+				.WithMethod("Widen", [typeof(System.Numerics.Vector<System.Byte> /*source*/), typeof(System.Numerics.Vector<System.UInt16> /*low*/).MakeByRefType(), typeof(System.Numerics.Vector<System.UInt16> /*high*/).MakeByRefType(),], Accessibility.Protected)
                 .WithMethod("Widen", [typeof(System.Numerics.Vector<System.Int16> /*source*/), typeof(System.Numerics.Vector<System.Int32> /*low*/).MakeByRefType(), typeof(System.Numerics.Vector<System.Int32> /*high*/).MakeByRefType(),], Accessibility.Protected)
                 .WithMethod("Widen", [typeof(System.Numerics.Vector<System.Int32> /*source*/), typeof(System.Numerics.Vector<System.Int64> /*low*/).MakeByRefType(), typeof(System.Numerics.Vector<System.Int64> /*high*/).MakeByRefType(),], Accessibility.Protected)
                 .WithMethod("Widen", [typeof(System.Numerics.Vector<System.SByte> /*source*/), typeof(System.Numerics.Vector<System.Int16> /*low*/).MakeByRefType(), typeof(System.Numerics.Vector<System.Int16> /*high*/).MakeByRefType(),], Accessibility.Protected)
@@ -1140,8 +1306,11 @@ public static class CasPolicyBuilderExtensions
                 .WithMethod("WidenUpper", [typeof(System.Numerics.Vector<System.Single> /*source*/),], Accessibility.Protected)
                 .WithMethod("WidenUpper", [typeof(System.Numerics.Vector<System.UInt16> /*source*/),], Accessibility.Protected)
                 .WithMethod("WidenUpper", [typeof(System.Numerics.Vector<System.UInt32> /*source*/),], Accessibility.Protected)
-                .WithMethod("WithElement", Accessibility.Protected)
-                .WithMethod("Xor", Accessibility.Protected))
+				.WithMethod("WithElement", [typeof(System.Numerics.Vector2), typeof(int), typeof(float)], Accessibility.Protected)
+				.WithMethod("WithElement", [typeof(System.Numerics.Vector3), typeof(int), typeof(float)], Accessibility.Protected)
+				.WithMethod("WithElement", [typeof(System.Numerics.Vector4), typeof(int), typeof(float)], Accessibility.Protected)
+				//.WithMethod("WithElement", [typeof(System.Numerics.Vector<>), typeof(int), typeof(T)], Accessibility.Protected)
+				.WithMethod("Xor", Accessibility.Protected))
             .Allow(new TypeBinding(typeof(System.Numerics.TotalOrderIeee754Comparer<>), Accessibility.Protected))
             .Allow(new TypeBinding(typeof(System.Numerics.Vector<>), Accessibility.Protected))
             .Allow(new TypeBinding(typeof(System.Numerics.Vector2), Accessibility.Protected))
@@ -3117,6 +3286,7 @@ public static class CasPolicyBuilderExtensions
             .WithSandboxedSystemThreadingTasksDataflow()
             .WithSandboxedSystemThreadingTasksParallel()
             .WithSandboxedSystemLinqExpressions()
-            .WithSandboxedRuntimeReflection();
+            .WithSandboxedRuntimeReflection()
+			.WithHardwareIntrinsicsSandbox();
     }
 }
