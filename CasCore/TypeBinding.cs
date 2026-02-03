@@ -163,7 +163,7 @@ public sealed class TypeBinding : IEnumerable<MemberInfo>
 
         if (methods.Count() != 1)
         {
-            throw new ArgumentException($"Could not find method {name} to add to binding for {_type}.");
+            throw new ArgumentException($"Could not find method {name} to add to binding for {_type}, or more than one method of that name was found.");
         }
 
         _selectedMembers.Add(methods.First());
@@ -198,7 +198,7 @@ public sealed class TypeBinding : IEnumerable<MemberInfo>
 
         if (methods.Count() != 1)
         {
-            throw new ArgumentException($"Could not find method {name} to add to binding for {_type}.");
+            throw new ArgumentException($"Could not find method {name} to add to binding for {_type}, or more than one method of that name was found.");
         }
 
         _selectedMembers.Add(methods.First());
